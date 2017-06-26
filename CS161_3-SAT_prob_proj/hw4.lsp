@@ -2,8 +2,6 @@
 
 ; this is the main calling function. it initializes sath_1 function as well as the
 ; printing of the result
-;		****** ****** 	run nil rmvr here -- it shouldnt return anything until after recursing -- only print failure if length is zero 
-;						it should find solution if it exists in sath_2 function
 
 (defun sat? (n delta)
 	(set 'sat-h (sath_1 (list delta NIL)))
