@@ -1,1 +1,1 @@
-# other_UCLA_CS
+This repository contains a sample of my projects from CS 35L, CS 161, and CS 143 at University of California, Los Angeles
