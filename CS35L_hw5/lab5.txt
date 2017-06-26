@@ -1,0 +1,291 @@
+wget "http://web.cs.ucla.edu/classes/fall16/cs35L/assign/coreutils-with-bug.tar.gz"
+
+mkdir Lab5
+mv coreutils-with-bug.tar.gz  ~/Lab5
+cd Lab5
+
+tar -xf coreutils-with-bug.tar.gz
+
+ls
+
+./configure
+
+make
+
+#note: make did not complete. Instead we see that there is the following error:
+
+In file included from utimecmp.c:41:0:
+utimens.h:2:5: error: conflicting types for 'futimens'
+ int futimens (int, char const *, struct timespec const [2]);
+     ^
+In file included from utimecmp.h:25:0,
+                 from utimecmp.c:25:
+/usr/include/sys/stat.h:373:12: note: previous declaration of 'futimens' was here
+ extern int futimens (int __fd, const struct timespec __times[2]) __THROW;
+            ^
+make[3]: *** [utimecmp.o] Error 1
+make[3]: Leaving directory `/w/home.09/class/classzac/Lab5/coreutils-with-bug/lib'
+make[2]: *** [all] Error 2
+make[2]: Leaving directory `/w/home.09/class/classzac/Lab5/coreutils-with-bug/lib'
+make[1]: *** [all-recursive] Error 1
+make[1]: Leaving directory `/w/home.09/class/classzac/Lab5/coreutils-with-bug'
+make: *** [all] Error 2
+
+
+
+wget "http://web.cs.ucla.edu/classes/fall16/cs35L/assign/coreutils.diff"
+
+emacs coreutils.diff
+
+from opening and inspecting the above file we see that the patch makes changes to 
+/lib folder as well as the /src folder and that these file paths correspond to the same
+file paths as the ones on our system for /lib and /src (notice how this differs from Lab3
+where we had to apply patch -p1)
+
+patch -p0 < coreutils.diff
+
+from which we see in the terminal:
+
+patching file lib/utimens.c
+patching file lib/utimens.h
+patching file src/copy.c
+patching file src/tee.c
+patching file src/touch.c
+
+
+I typed "make" again in the terminal, and this time it made sans errors.
+
+
+I then typed the commands to reproduce the bug as given in the lab specs which gives
+results sans bugs:
+
+tmp=$(mktemp -d)
+cd $tmp
+touch -d '1918-11-11 11:00 GMT' wwi-armistice
+touch now
+sleep 1
+touch now1
+TZ=UTC0 ls -lt --full-time wwi-armistice now now1
+-rw-r--r-- 1 classzac class 0 2016-10-31 01:39:42.665679071 +0000 now1
+-rw-r--r-- 1 classzac class 0 2016-10-31 01:39:29.131318904 +0000 now
+-rw-r--r-- 1 classzac class 0 1918-11-11 11:00:00.000000000 +0000 wwi-armistice
+
+
+I then made my way back to the core-utils folder and typed "pwd" to get my path directory to where my /src/ls with bug is stored
+= ~/Lab5/coreutils-with-bug
+
+
+then back to the tmp folder
+
+cd $tmp
+TZ=UTC0 ~/Lab5/coreutils-with-bug/src/ls -lt --full-time wwi-armistice now now1
+-rw-r--r-- 1 classzac class 0 1918-11-11 11:00:00.000000000 +0000 wwi-armistice
+-rw-r--r-- 1 classzac class 0 2016-10-31 01:39:42.665679071 +0000 now1
+-rw-r--r-- 1 classzac class 0 2016-10-31 01:39:29.131318904 +0000 now
+
+notice how wwi-armistice here is listed as occurring after the touched files now and now1 from mere minutes ago
+
+I then made my way to the ~/Lab5/coreutils-with-bug/src folder
+Here we see that ls.c appears to be the main function in the implementation of ls in /src
+hence we begin inspection here
+
+emacs ls.c
+
+here we see that there is a function called sort_files which is highly plausible the culprit
+
+I ran:
+gdb --args  ~/Lab5/coreutils-with-bug/src/ls -lt --full-time wwi-armistice now now1
+
+and at first ran into a complication:
+
+(gdb) break sort_files
+Breakpoint 1 at 0x4040d0: file ls.c, line 2954.
+(gdb) run
+Starting program: /u/eng/class/classzac/Lab5/coreutils-with-bug/src/ls -lt --full-time wwi-armistice now now1
+
+Breakpoint 1, sort_files () at ls.c:2954
+2954	{
+Missing separate debuginfos, use: debuginfo-install glibc-2.17-106.el7_2.8.x86_64
+
+I researched the error and tried to resolve it to no avail.  Being fond of the scientific 
+method, I tried again just to make sure that I get that error again.
+
+(gdb) break sort_file
+Function "sort_file" not defined.
+Make breakpoint pending on future shared library load? (y or [n]) n
+(gdb) break sort_files
+Note: breakpoint 1 also set at pc 0x4040d0.
+Breakpoint 2 at 0x4040d0: file ls.c, line 2954.
+(gdb) run
+The program being debugged has been started already.
+Start it from the beginning? (y or n) y
+
+Starting program: /u/eng/class/classzac/Lab5/coreutils-with-bug/src/ls -lt --full-time wwi-armistice now now1
+
+Breakpoint 1, sort_files () at ls.c:2954
+2954	{
+
+		and thus we see that the program worked the second time around.  No idea why.
+		
+(gdb) where
+#0  sort_files () at ls.c:2954
+#1  0x000000000040360b in main (argc=6, argv=<optimized out>) at ls.c:1259
+(gdb) n
+2962	  if (! setjmp (failed_strcoll))
+(gdb) print
+The history is empty.
+(gdb) n
+2964	      switch (sort_type)
+(gdb) n
+2969		  switch (time_type)
+(gdb) where
+#0  sort_files () at ls.c:2969
+#1  0x000000000040360b in main (argc=6, argv=<optimized out>) at ls.c:1259
+(gdb) s
+2975		      func = sort_reverse ? rev_cmp_mtime : compare_mtime;
+
+
+	and thus I have found an interesting function to inspect further
+	
+	I continued with more "s" and "n" calls
+	
+(gdb) s
+3034	  qsort (files, files_index, sizeof *files, func);
+(gdb) s
+3035	}
+(gdb) s
+main (argc=6, argv=<optimized out>) at ls.c:1260
+1260	      if (!immediate_dirs)
+
+
+	but on first pass only compare_mtime catches my attention
+	
+I set a new break in gdb to find the line in ls.c that compare_mtime occurs
+
+(gdb) break compare_mtime
+Breakpoint 3 at 0x406483: compare_mtime. (2 locations)
+(gdb) run
+The program being debugged has been started already.
+Start it from the beginning? (y or n) y
+
+Breakpoint 3, compare_mtime (a=0x617160, b=0x617210) at ls.c:2884
+2884	static int compare_mtime (V a, V b) { return cmp_mtime (a, b, xstrcoll); }
+
+thus finding compare_time:
+
+static int compare_mtime (V a, V b) { return cmp_mtime (a, b, xstrcoll); }
+
+to which I see that it uses the function above it
+
+static inline int
+cmp_mtime (struct fileinfo const *a, struct fileinfo const *b,
+           int (*cmp) (char const *, char const *))
+{
+  int diff = timespec_cmp (get_stat_mtime (&b->stat),
+                           get_stat_mtime (&a->stat));
+  return diff ? diff : cmp (a->name, b->name);
+}
+
+to which has timespec_cmp in it.  Going back to gdb I step into it
+
+(gdb) s
+timespec_cmp (b=..., a=...) at ../lib/timespec.h:48
+48	  int diff = a.tv_sec - b.tv_sec;
+(gdb) where
+#0  timespec_cmp (b=..., a=...) at ../lib/timespec.h:48
+
+then opening timespec.h in the lib folder (in coreutils-with_bug)
+
+emacs timespec.h
+
+
+wherein we see:
+
+timespec_cmp (struct timespec a, struct timespec b)
+{
+  int diff = a.tv_sec - b.tv_sec;
+  return diff ? diff : a.tv_nsec - b.tv_nsec;
+}
+
+which uses some data structure called timespec defined above it.  Therein we see that
+tv_sec and long are the two data types within this structure.  
+
+struct timespec
+{
+  time_t tv_sec;
+  long tv_nsec;
+};
+
+I have no idea what a time_t data type is so I google it and find this webpage:
+
+http://stackoverflow.com/questions/471248/what-is-ultimately-a-time-t-typedef-to
+
+and find out that this datatype isn't well defined, but that:
+
+	time_t is of type long int on 64 bit machines, else it is long long int.
+
+thus we see that this is very probably the source of our problems since
+
+int diff = a.tv_sec - b.tv_sec;
+
+and tv_sec is either long or long long causing integer overflow -- the opposite of truncation
+error
+
+cp timespec.h timespec_new.h
+
+emacs timespec_new.h
+
+and changed int diff into long diff as seen below 
+
+timespec_cmp (struct timespec a, struct timespec b)
+{
+  long diff = a.tv_sec - b.tv_sec;
+  return diff ? diff : a.tv_nsec - b.tv_nsec;
+}
+
+C-x 4 a G
+git commit -F src/ChangeLog
+
+
+cd ..
+
+I reran the commands to check the sorting of dates (lines 62 to 68)
+
+this didn't fix it.
+I then remembered that the file lib.c is compiled and would need to be recompiled
+
+
+
+patch -p0 < lab5.diff
+patching file timespec.h
+
+This did not solve the problem.
+
+On reinspection I realized that interger overflow could still be happening bc of the
+nature of the subtraction.  But before continuing I wanted to make sure this time.
+According to google ints are occasionally implemented as longs.  Both having 32 byte capacity
+with a maximum signed integer value of 2,147,483,647 which when I googled "2147483647 seconds to years"
+I discovered that this number is 68.096259734906 years. Since time is recorded as number of seconds from 
+some time in the 1970s, we see that long int is not long enough, but that long long int is, however we could
+still get integer overflow from the casting back to long that occurs, thus need to implement 
+conditionals to return the sort comparison of the dates.
+
+I redid it again. Still didn't work.  checked what was happening when I ran make and
+realized I wasn't making everything.  went to the src folder and ran make, then ran 
+the commands again and this time it all worked as it should.  
+
+Now I need to get an original version of timespec.h 
+
+Thus
+
+cp -R coreutils-with-bug coreutils-with-bug_0
+
+rm -Rf coreutils-with-bug
+
+tar -xf coreutils-with-bug.tar.gz
+
+diff -u ~/Lab5/coreutils-with-bug/lib/timespec.h ~/Lab5/coreutils-with-bug_0/lib/timespec.h > lab5.diff
+
+Now I'm done hooray.
+
+

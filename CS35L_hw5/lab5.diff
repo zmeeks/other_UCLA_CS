@@ -1,0 +1,27 @@
+--- /u/eng/class/classzac/Lab5/coreutils-with-bug/lib/timespec.h        2005-09-21 23:05:39.000000000 -0700                                                                                               
++++ /u/eng/class/classzac/Lab5/coreutils-with-bug_0/lib/timespec.h      2016-11-06 21:06:17.217371000 -0800                                                                                               
+@@ -16,6 +16,8 @@
+    along with this program; if not, write to the Free Software Foundation,                                                                                                                               
+    Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.  */                                                                                                                                
+                                                                                                                                                                                                          
++#include<stdio.h>                                                                                                                                                                                        
++                                                                                                                                                                                                         
+ #if ! defined TIMESPEC_H                                                                                                                                                                                 
+ # define TIMESPEC_H                                                                                                                                                                                      
+                                                                                                                                                                                                          
+@@ -45,8 +47,12 @@
+ static inline int                                                                                                                                                                                        
+ timespec_cmp (struct timespec a, struct timespec b)                                                                                                                                                      
+ {                                                                                                                                                                                                        
+-  int diff = a.tv_sec - b.tv_sec;                                                                                                                                                                        
+-  return diff ? diff : a.tv_nsec - b.tv_nsec;                                                                                                                                                            
++  long long diff = (long long)a.tv_sec - (long long)b.tv_sec;                                                                                                                                            
++    if (diff == 0)                                                                                                                                                                                       
++      return 0;                                                                                                                                                                                          
++    else if (diff <0)                                                                                                                                                                                    
++      return -1;                                                                                                                                                                                         
++  return 1;                                                                                                                                                                                              
+ }                                                                                                                                                                                                        
+                                                                                                                                                                                                          
+ # if ! HAVE_DECL_NANOSLEEP                                                                                                                                                                               
+
