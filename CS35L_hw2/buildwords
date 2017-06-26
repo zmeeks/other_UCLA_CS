@@ -1,0 +1,11 @@
+#!/usr/bin/bash      
+
+# buildwords script         
+
+web=$1
+
+grep "<t[rd]>" $web | sed "/tr/,/td/d" | sed "s/<[^>]*>//g" |
+sed "s/\`/'/g" | tr A-Z a-z | tr '[:blank:]' '[\n*]' | tr ',' '[\n*]' |
+sort | uniq | grep -v "[^pk'mnwlhaeiou]" > hwords
+ 
+# this scripts documentation/details may be found in the lab2.log file

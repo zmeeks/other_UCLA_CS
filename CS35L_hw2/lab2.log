@@ -1,0 +1,84 @@
+cp /usr/share/dict/words  words1
+emacs words1
+sort words1 > words
+
+wget "http://web.cs.ucla.edu/classes/fall16/cs35L/assign/assign2.html"
+
+cat assign2.html | tr -c 'A-Za-z' '[\n*]' > assign2a.html
+emacs assign2g.html
+
+^This had the effect of erasing everything that wasn't a letter and 
+where there previously existed a non-letter character, now there 
+exists a new-line.
+
+cat assign2.html | tr -cs 'A-Za-z' '[\n*]' > assign2b.html
+emacs assign2b.html
+
+^This file differs from assign2a.html in that the blank newlines have
+been removed
+
+cat assign2.html | tr -cs 'A-Za-z' '[\n*]' | sort > assign2c.html
+emacs assign2c.html
+
+^This file differs from assign2b.html in that now the 
+lines of text are sorted
+
+cat assign2.html | tr -cs 'A-Za-z' '[\n*]' | sort -u > assign2d.html
+emacs assign2d.html
+
+^note -u is the same as --unique, hence we see that 
+this file has duplicate lines removed
+
+cat assign2.html | tr -cs 'A-Za-z' '[\n*]' | sort -u |
+comm - words > assign2e.html
+
+emacs assign2e.html
+
+^This now contains all of the words in alphabetic order, same as the file 
+'words' that we initially created, but now all instances of the words that
+occur in 'assign2d.html' are tabbed to the right of the main 'words' list,
+and all words that are found in but not in the list 'words' are tabbed to 
+the left of the list, so that essentially there are three columns of words.
+In other words there are now three columns, col-1 contains words unique to
+assign2d.html, col-2 contains words unique to the file words, and col-3 
+contains words contained in both
+
+cat assign2.html | tr -cs 'A-Za-z' '[\n*]' | sort -u | 
+comm -23 - words > assign2f.html
+
+emacs assign2f.html
+
+
+of the English words found in 'assign2d.html', only the words not found 
+in the list of English words are kept.
+
+wget "http://mauimapp.com/moolelo/hwnwdseng.htm"
+
+
+cat hwnwdseng.htm | grep "<t[rd]>" | sed "/tr/,/td/d" | 
+sed "s/<[^>]*>//g" | sed "s/\`/'/g" | tr A-Z a-z | 
+tr -cs '[:graph:]' '[\n*]' | tr ',' '[\n*]' | sort | uniq 
+
+
+cat assign2.html | tr A-Z a-z | tr -cs "a-z'" "[\n*]" | sort -u | 
+comm -23 - hwords | wc -l
+414
+cat assign2.html | tr A-Z a-z | tr -cs "a-z'" "[\n*]" | sort -u | 
+comm -23 - words | wc -l
+55
+
+
+from the above we see that there are 414 words misspelled in Hawaiian 
+and 55 words misspelled in English on the assignment webpage.
+
+cat assign2.html | tr A-Z a-z | tr -cs "a-z'" "[\n*]" | sort -u | 
+comm -12 - hwords
+
+cat assign2.html | tr A-Z a-z | tr -cs "a-z'" "[\n*]" | sort -u | 
+comm -23 - words
+
+from which running the above two commands we see that the word 'wiki' 
+and 'lau' (among a couple others) are misspelled in English, but
+not in Hawaiian.  Similarly we find that there are hundreds of words
+that are misspelled in Hawaiian, but not in English (the word 'unique' 
+is one such example)

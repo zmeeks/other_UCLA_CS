@@ -1,0 +1,61 @@
+#!/bin/sh                                                             
+
+# sameln script                               
+
+D=$1
+cd $D
+#so that ls command will target this directory                  
+
+file_list=`ls -a $D | grep "^\." | sort`  #grabs only the .leading entries
+
+declare -a check_files=`find $D -maxdepth 1 -type f | sort`
+#so that the array will be correctly sized                   
+
+let count=0 #for itterating into the array               
+
+for file in $file_list;
+do
+    check_files[$count]=$file
+    count=$((count+1))
+done
+#files into array                                
+
+file_list=`ls $D | sort` #this time grabs all of the other entries   
+
+for file in $file_list;
+do
+    check_files[$count]=$file
+    count=$((count+1))
+done
+#files into array                                                         
+
+for((i=0; i<$count;i++))
+do
+    if [ -f "${check_files[$i]}" ]
+    then
+        if [ -r "${check_files[$i]}" ]
+        then
+            #only files that are readable and regular will make it in 
+            #here for i                     
+            for((j=$((i+1)); j<$((count+1)); j++))
+            do
+                if [ -f "${check_files[$j]}" -a -r "${check_files[$j]}" ]
+                then
+                    #only files that are readable and regular will make 
+                    #it in here for j             
+                    cmp -s "${check_files[$i]}" "${check_files[$j]}"
+                    if [ $? -eq "0" ]    
+                    # $? = 1 or 0 (= the exit status of prev line)              
+                    then
+                        #adding hardlinks in place of duplicate file entries
+                        rm "${check_files[$j]}"
+                        ln "${check_files[$i]}" "$check_files[$j]}"
+                    fi
+                fi
+            done
+        else
+            #only executes if file is regular but not readable   
+            echo "error cannot read file "${check_files[$i]}
+        fi
+    fi
+done
